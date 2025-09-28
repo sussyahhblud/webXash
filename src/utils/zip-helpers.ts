@@ -5,7 +5,8 @@ const getZip = (
 ): Promise<ArrayBuffer> => {
   return new Promise(function (resolve, reject) {
     const req = new XMLHttpRequest();
-    const path = './' + zipPath + zipName;
+    // Check if zipName is an absolute URL (starts with http:// or https://)
+    const path = zipName.startsWith('http') ? zipName : './' + zipPath + zipName;
     req.responseType = 'arraybuffer';
 
     // Run callback on progress events

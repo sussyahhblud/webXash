@@ -1,41 +1,36 @@
 <template>
-  <div class="window" name="Open ZIP">
+  <div class="window" name="Download Data">
     <div class="box">
-      <button class="start-button" @click="openZip">Open ZIP</button>
-      <input
-        ref="zipSelector"
-        type="file"
-        hidden
-        accept=".zip"
-        @change="onZipSelect"
-      />
+      <button class="start-button" :disabled="loading" @click="downloadHalfLife">
+        {{ loading ? 'Downloading...' : 'Download Half-Life' }}
+      </button>
+      <div v-if="loading && downloadProgress > 0" class="progress-container">
+        <div class="progress-text">Download Progress: {{ downloadProgress }}%</div>
+        <div class="progress-bar">
+          <div class="progress-fill" :style="{ width: downloadProgress + '%' }"></div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
-import type { Ref } from "vue";
 import { useXashStore } from "/@/stores/store";
+import { storeToRefs } from "pinia";
+import { computed } from "vue";
 
 const store = useXashStore();
-const zipSelector: Ref<HTMLInputElement | null> = ref(null);
-const { startXashZip } = store;
+const { downloadHalfLifeZip } = store;
+const { loading, loadingProgress } = storeToRefs(store);
 
-const openZip = async () => {
-  zipSelector.value?.click();
-};
+// Create a computed property for download progress percentage
+const downloadProgress = computed(() => {
+  return Math.round(loadingProgress.value);
+});
 
-const onZipSelect = () => {
-  const reader = new FileReader();
-  reader.onload = () => {
-    if (!reader.result) {
-      alert("Unable to load zip!");
-      return;
-    }
-    startXashZip?.(reader.result as ArrayBuffer);
-  };
-  reader.readAsArrayBuffer(zipSelector.value?.files?.[0] as Blob);
+const downloadHalfLife = async () => {
+  const valveZipUrl = "https://dl.dropboxusercontent.com/scl/fi/dd7xlatfsl4vjw8qo6c25/valve.zip?rlkey=uw3pzoscn27qp2y7mebwoy39j&st=bw6oc8oj&dl=0";
+  await downloadHalfLifeZip?.(valveZipUrl);
 };
 </script>
 
@@ -43,5 +38,31 @@ const onZipSelect = () => {
 .start-button {
   text-align: center;
   width: 100%;
+}
+
+.progress-container {
+  margin-top: 1rem;
+  text-align: center;
+}
+
+.progress-text {
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+  color: #ddd;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 20px;
+  background-color: #333;
+  border: 1px solid #555;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4CAF50 0%, #8BC34A 100%);
+  transition: width 0.3s ease;
 }
 </style>

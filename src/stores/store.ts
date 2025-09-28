@@ -278,6 +278,138 @@ export const useXashStore = defineStore(
       await onAfterLoad(xash);
     };
 
+    // Store the downloaded zip data
+    const downloadedZipData = ref<ArrayBuffer | null>(null);
+
+    const downloadHalfLifeZip = async (url: string) => {
+      onStartLoading();
+      
+      try {
+        // Download the zip file from the URL
+        const zipBuffer = await getZip(url, '', (progress: number) => (loadingProgress.value = progress));
+        
+        if (!zipBuffer) {
+          console.error('Failed to download the zip file.');
+          // Only clear loading state, don't hide the UI
+          loading.value = false;
+          alert('Failed to download Half-Life. Please check your internet connection and try again.');
+          return;
+        }
+
+        // Store the downloaded zip data
+        downloadedZipData.value = zipBuffer;
+        selectedZip.value = 'half-life-downloaded'; // Set a flag to enable start button
+        
+        // Only clear loading state, don't hide the UI
+        loading.value = false;
+        alert('Half-Life downloaded successfully! Click Start to play.');
+      } catch (error) {
+        console.error('Error downloading zip file:', error);
+        // Only clear loading state, don't hide the UI
+        loading.value = false;
+        alert('Failed to download Half-Life. Please try again.');
+      }
+    };
+
+    const startXashZipFromUrl = async (url: string) => {
+      if (!xashCanvas.value) {
+        console.error('Xash canvas is not available.');
+        return;
+      }
+      
+      onStartLoading();
+      
+      try {
+        // Download the zip file from the URL
+        const zipBuffer = await getZip(url, '', (progress: number) => (loadingProgress.value = progress));
+        
+        if (!zipBuffer) {
+          console.error('Failed to download the zip file.');
+          onEndLoading();
+          alert('Failed to download Half-Life. Please check your internet connection and try again.');
+          return;
+        }
+
+        const xash = await initXash();
+        const zipData = new Uint8Array(zipBuffer);
+        const files = unzipSync(zipData);
+
+        xash.em.FS.mkdirTree(XASH_BASE_DIR);
+
+        for (const [filename, content] of Object.entries(files)) {
+          const path = XASH_BASE_DIR + filename;
+          if (filename.endsWith('/')) {
+            xash.em.FS.mkdirTree(path);
+          } else {
+            const dir = path.substring(0, path.lastIndexOf('/'));
+            if (dir) {
+              xash.em.FS.mkdirTree(dir);
+            }
+            xash.em.FS.writeFile(path, content);
+          }
+        }
+
+        xash.em.FS.chdir(XASH_BASE_DIR);
+        xash.main();
+
+        onEndLoading();
+        await onAfterLoad(xash);
+      } catch (error) {
+        console.error('Error downloading or processing zip file:', error);
+        onEndLoading();
+        alert('Failed to download Half-Life. Please try again.');
+      }
+    };
+
+    const startDownloadedGame = async () => {
+      if (!xashCanvas.value) {
+        console.error('Xash canvas is not available.');
+        return;
+      }
+
+      if (!downloadedZipData.value) {
+        console.error('No downloaded game data available.');
+        return;
+      }
+      
+      // Set loading state but keep UI visible
+      loading.value = true;
+      setCanvasLoading();
+      
+      try {
+        const xash = await initXash();
+        const zipData = new Uint8Array(downloadedZipData.value);
+        const files = unzipSync(zipData);
+
+        xash.em.FS.mkdirTree(XASH_BASE_DIR);
+
+        for (const [filename, content] of Object.entries(files)) {
+          const path = XASH_BASE_DIR + filename;
+          if (filename.endsWith('/')) {
+            xash.em.FS.mkdirTree(path);
+          } else {
+            const dir = path.substring(0, path.lastIndexOf('/'));
+            if (dir) {
+              xash.em.FS.mkdirTree(dir);
+            }
+            xash.em.FS.writeFile(path, content);
+          }
+        }
+
+        xash.em.FS.chdir(XASH_BASE_DIR);
+        xash.main();
+        
+        // Hide UI only after successful launch
+        showXashSettingUI.value = false;
+        loading.value = false;
+        await onAfterLoad(xash);
+      } catch (error) {
+        console.error('Error starting downloaded game:', error);
+        loading.value = false;
+        alert('Failed to start the game. Please try downloading again.');
+      }
+    };
+
     const onAfterLoad = async (xash: Xash3D) => {
       await delay(1500); // Wait for xash to fully load first.
       if (enableCheats.value) {
@@ -307,9 +439,14 @@ export const useXashStore = defineStore(
       fullScreen,
       enableConsole,
       enableCheats,
+      downloadedZipData,
       onStartLoading,
+      onEndLoading,
       downloadZip,
       startXashZip,
+      startXashZipFromUrl,
+      downloadHalfLifeZip,
+      startDownloadedGame,
       startXashFiles,
     };
   },
